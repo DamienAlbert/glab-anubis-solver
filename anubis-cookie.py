@@ -35,6 +35,7 @@ import urllib.request
 
 DEFAULT_USER_AGENT = 'glab-cli anubis-cookie/1.0'
 CONFIG_SECTION = 'anubis-cookie'
+EXEMPT_COOKIE = 'anubis-cookie=exempt'
 CACHE_DIR = os.path.join(os.path.expanduser('~'), '.cache', 'anubis-cookie')
 REFRESH_MARGIN = 3600       # re-solve when the cookie expires in less than 1h
 LOCK_WAIT = 25              # glab kills the command after 30s
@@ -115,6 +116,7 @@ def find_auth_cookie(jar):
 
 
 def solve(host, user_agent):
+    """Solve the challenge; returns the cache entry, or None if no challenge is served."""
     base = f'https://{host}'
     jar = http.cookiejar.CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar), NoRedirect())
@@ -122,7 +124,8 @@ def solve(host, user_agent):
     status, _, page = fetch(opener, base + '/', user_agent)
     challenge = script_json(page, 'anubis_challenge')
     if challenge is None:
-        raise RuntimeError(f'no Anubis challenge on {base}/ (HTTP {status}); exempt or not behind Anubis?')
+        log(f'no Anubis challenge on {base}/ (HTTP {status}), client looks exempt')
+        return None
     version = script_json(page, 'anubis_version')
     prefix = script_json(page, 'anubis_base_prefix') or ''
     rules = challenge.get('rules', {})
@@ -226,6 +229,8 @@ def get_cookie(host, user_agent, refresh=False):
         if not refresh and (entry := read_cache(host, user_agent)):
             return entry
         entry = solve(host, user_agent)
+        if entry is None:
+            return None
         write_cache(host, entry)
         log(f'cached {entry["cookie_name"]}, expires {time.strftime("%Y-%m-%d %H:%M", time.localtime(entry["exp"]))}')
         return entry
@@ -251,6 +256,10 @@ def main(argv):
     except Exception as e:
         log(f'error: {e}')
         return 1
+    if entry is None:
+        # glab needs a non-empty header value; an unknown cookie is ignored by the server.
+        print(EXEMPT_COOKIE)
+        return 0
     print(f'{entry["cookie_name"]}={entry["value"]}')
     return 0
 

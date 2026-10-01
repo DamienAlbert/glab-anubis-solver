@@ -10,8 +10,7 @@ does, caches the cookie, and glab sends it with every request through its
 `custom_headers` setting.
 
 It pays the proof-of-work Anubis asks for, nothing more: one solve per cookie lifetime,
-no parallel solving, a fixed and truthful User-Agent. If your GitLab admins declined an
-Anubis exemption for the API, let them know you use this.
+no parallel solving, a fixed and truthful User-Agent.
 
 ## Requirements
 
@@ -89,8 +88,11 @@ A lock file makes concurrent glab processes wait for a single solve.
 - **glab prints the "Making sure you're not a bot!" page**: the challenge records the
   client IP, so a cookie obtained on another network (VPN on/off) may be refused. Run
   `anubis-cookie --refresh <host>`.
-- **`no Anubis challenge`**: the host didn't serve a challenge, e.g. your IP is exempt.
-  glab needs a non-empty header value, so remove the `custom_headers` in that case.
+- **`no Anubis challenge … client looks exempt`**: the host didn't serve a challenge,
+  e.g. your IP is allowed by the Anubis policy (VPN, internal network). Not an error:
+  `anubis-cookie` prints the placeholder `anubis-cookie=exempt`, which the server ignores,
+  because glab needs a non-empty header value. Nothing is cached, so the next run outside
+  the exempt network solves the challenge normally.
 - **`unsupported Anubis algorithm`**: the instance uses a challenge this script doesn't
   implement.
 
